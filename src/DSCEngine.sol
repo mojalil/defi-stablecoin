@@ -25,6 +25,7 @@ pragma solidity ^0.8.18;
 
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title Decentralized Stable Coin Engine
@@ -44,6 +45,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__MustBeMoreThanZero();
     error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
     error DSCEngine__NotAllowedToken();
+    error DSCEngine__DepositTransferFailed();
 
 
     // State Variables
@@ -51,6 +53,9 @@ contract DSCEngine is ReentrancyGuard {
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
 
     DecentralizedStableCoin private immutable i_dsc;
+
+    // Events
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
 
     // Modifiers
     modifier moreThanZero(uint256 _amount){
@@ -91,15 +96,25 @@ contract DSCEngine is ReentrancyGuard {
     function depositCollateralAndMintDsc() external {}
 
     /**
-     * 
+     * @notice Follows CEI pattern (Checks - Effects - Interactions)
      * @param tokenCollateralAddress The address of the token to deposit
      * @param amountCollateral The amount of the token to deposit
+     * @dev This function is meant to be called by the user. It will transfer the tokens from the user to this contract.
+     * We are using the CEI pattern to prevent reentrancy attacks.
+     * We are using IERC20 because the exteral may be a contract that is not standard ERC20 but does implment it's interface.
      */
     function depositCollateral( address tokenCollateralAddress, uint256 amountCollateral) 
         external 
         moreThanZero(amountCollateral) 
         isAllowedToken(tokenCollateralAddress)
         nonReentrant {
+            s_collateralDeposited[msg.sender][tokenCollateralAddress] += amountCollateral;
+            emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
+            bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
+            if(!success) {
+                revert DSCEngine__DepositTransferFailed();
+            }
+
         // Transfer the tokens from the user to this contract
         // Approve the transfer first
         // Transfer the tokens
@@ -107,9 +122,6 @@ contract DSCEngine is ReentrancyGuard {
         // If the balance is greater than the amount of collateral, mint DSC
         // If the balance is less than the amount of collateral, revert
         // If the balance is equal to the amount of collateral, do nothing
-    }
-
-
     }
 
 
