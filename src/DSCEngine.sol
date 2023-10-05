@@ -47,10 +47,16 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TokenAddressesAndPriceFeedAddressesMustBeSameLength();
     error DSCEngine__NotAllowedToken();
     error DSCEngine__DepositTransferFailed();
+    error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
+    error DSCEngine__MintFailed();
 
     // State Variables
     uint256 private constant PRECISION = 1e18;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // means you have to be 200% over collateralized to be safe
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
+
     mapping(address token => address s_priceFeeds) public s_priceFeeds;
     mapping(address user => mapping(address token => uint256 amount))
         private s_collateralDeposited;
@@ -161,7 +167,11 @@ contract DSCEngine is ReentrancyGuard {
     ) external moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
         // If they minted too much ($150 DSC for $100 collateral), revert
-        revertIfHealthFactorIsBroken(msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+        bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+        if (!minted) {
+            revert DSCEngine__MintFailed();
+        }
     }
 
     function burnDsc() external {}
@@ -201,11 +211,23 @@ contract DSCEngine is ReentrancyGuard {
         ) = _getAccountInformation(user);
         // divide the value of the collateral by the value of the DSC
         // return the health factor
+
+        // Return adujusted health factor using the liquidation threshold
+        uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
+
+        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
+        
     }
 
-    function revertIfHealthFactorIsBroken(address user) internal view {
+    function _revertIfHealthFactorIsBroken(address user) internal view {
         // check health factor
         // if health factor is broken, revert, see AAVE docs for formula. Link: https://docs.aave.com/risk/asset-risk/risk-parameters
+
+        uint256 userHealthFactor = _healthFactor(user);
+
+        if(userHealthFactor < MIN_HEALTH_FACTOR){
+            revert DSCEngine__BreaksHealthFactor(userHealthFactor);
+        }
     }
 
     // Public & External View Functions
@@ -239,7 +261,7 @@ contract DSCEngine is ReentrancyGuard {
         // Get the price from the price feed
         (, int256 price, , , ) = priceFeed.latestRoundData();
         // if 1eth = $1000, the returned value is be 1000 * 10^8. We can check the decimals from chainlink docs
-        // Convert the price to 10^18 decimals
+        // Convert the price to 10^18 decimals so they are all the right precision. Then divide by the precision to get the price (otherwise it'll be a huge number)
         uint256 precisePrice = ((uint256(price) * ADDITIONAL_FEED_PRECISION) *
             amount) / PRECISION;
         // Return the price
