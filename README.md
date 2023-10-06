@@ -45,7 +45,7 @@ To integrate or use this system, deploy the contract, and call its functions as 
 
 ## Running Tests
 
-To run individual test use forge test and match with the test you want to run e.g `forge test --match-test testGetUsdValue`
+To run individual test use forge test and match with the test you want to run e.g `forge test --match-test testGetUsdValue` or use `-vvv` tag for a more verborse output `forge test --match-test testGetUsdValue -vvv`
 
 ## Safety
 

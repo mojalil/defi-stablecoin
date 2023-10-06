@@ -25,7 +25,7 @@ contract DSCEngineTest is Test {
     // Price Test
     function testGetUsdValue() public{
         uint256 ethAmount = 15e18;
-        uint256 expectedUsd = 30000e8;
+        uint256 expectedUsd = 30000e18;
         uint256 actualUsd = dsce.getUsdValue(weth, ethAmount);
 
         assertEq(expectedUsd, actualUsd);
