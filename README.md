@@ -43,6 +43,10 @@ This is what DSC offers. A simplified, yet secure stable coin system.
 
 To integrate or use this system, deploy the contract, and call its functions as required by your platform. 
 
+## Running Tests
+
+To run individual test use forge test and match with the test you want to run e.g `forge test --match-test testGetUsdValue`
+
 ## Safety
 
 Always ensure that you are interacting with the correct contract address. Beware of imitations or scams. We recommend reading the contract code thoroughly and even getting it audited by third-party services before using it in a production environment.
