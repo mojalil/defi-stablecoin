@@ -18,11 +18,14 @@ contract DSCEngineTest is Test {
     address weth;
     address public USER = makeAddr("user");
     uint256 public constant AMOUNT_COLLATERAL = 10 ether;
+    uint256 public constant STARTING_ERC20_BALANCE = 100 ether;
 
     function setUp() public {
         deployer = new DeployDSC();
         (dsc, dsce, config) = deployer.run();
         (ethUsdPriceFeed, , weth, , ) = config.activeNetworkConfig();
+
+        ERC20Mock(weth).mint(address(USER), STARTING_ERC20_BALANCE);
     }
 
     // Price Test
